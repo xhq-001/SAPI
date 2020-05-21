@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import javax.jws.WebService;
 import javax.xml.ws.WebServiceContext;
-import java.util.List;
 
 @WebService(serviceName = "DataWebService",
         targetNamespace = "http://controller.seaboxdata.com/",
@@ -74,7 +73,7 @@ public class WebServiceController implements IWebServiceController {
     @Override
     public String getIsHasData(String search) {
         ResultInfo dataXml = getDataXml(1, 1, search);
-        List result = dataXml.getData().getResult();
+        java.util.List result = dataXml.getData().getResult();
         Boolean res;
         if (result.size() > 0) {
             res = true;

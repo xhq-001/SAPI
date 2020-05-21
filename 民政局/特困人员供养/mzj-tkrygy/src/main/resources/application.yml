@@ -1,10 +1,12 @@
+serviceCode: mzj-tkrygy
 server:
-  port: 10001
+  port: 20002
 custom:
   webserviceURL: http://23.29.250.100:8082/ws/NetWsService?wsdl
   namespaceURI: http://ws.bus.cqhg.com/
   jksqm: BUY8WV6VPKBH7A1TWVG26OXYC4HO2R2YRYXCZU85YLT89UY56BF0DGDOZGWZM9TGI8T759ZUHABFJW3IGXOF8GMRFTBM32MGTNFE4Y0NMQFWCH7GDLEUQF7X25T8CM
   publicKey: MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDphchZIndicD8yr6Peo/5shpppzGJfllKI4cYDJ16OQfeOqmOAGELoAgTKWgN0GvEZnqhcX9JKgZa/91uhSK+ar0Z4P9eqKJqw9BJYALVEEDWlLIH9YiRty6Ddl3JRkPO/oGGngvssYshEgWyT3r5ODOIsWCoqAd7/H7f2s12UHQIDAQAB
+  isTokenVerification: false
 spring:
   application:
     name: mzj-tkrygy

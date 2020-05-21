@@ -1,186 +1,196 @@
 package com.seaboxdata.service;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.seaboxdata.access.AccessInterface;
 import com.seaboxdata.api.core.auth.Authenticate;
-import com.seaboxdata.api.core.auth.FieldHandle;
 import com.seaboxdata.api.core.constant.ErrorFlagCode;
 import com.seaboxdata.api.core.constant.ResultCode;
+import com.seaboxdata.api.core.log.SinkLog;
 import com.seaboxdata.api.core.model.Column;
 import com.seaboxdata.api.core.model.ColumnShort;
 import com.seaboxdata.api.core.model.PageResponse;
 import com.seaboxdata.api.core.model.ResultInfo;
-import com.seaboxdata.api.core.model.auth.AuthField;
-import com.seaboxdata.api.core.model.auth.Field;
-import com.seaboxdata.api.core.model.token.JwtUserToken;
-import com.seaboxdata.api.core.utils.IpUtil;
-import com.seaboxdata.api.core.utils.JwtUtil;
+import com.seaboxdata.api.core.utils.JacksonUtil;
+import com.seaboxdata.api.core.utils.JwtUtils;
 import com.seaboxdata.api.core.utils.TitleUtil;
-import com.seaboxdata.api.core.xml.XmlParseObject;
-import com.seaboxdata.constant.CustomConstant;
+import com.seaboxdata.api.dto.FieldDto;
+import com.seaboxdata.api.dto.ResourceFieldAuth;
 import com.seaboxdata.model.Dysqmx;
-import org.apache.commons.lang3.StringUtils;
+import com.seaboxdata.sesb.auth.ip.IPProcess;
+import com.seaboxdata.sesb.log.model.ResourceTransferLog;
+import com.seaboxdata.sesb.pojo.dto.JwtIPDto;
+import com.seaboxdata.sesb.pojo.dto.JwtUserTokenDto;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class DataService {
     @Autowired
+    private SinkLog sinkLog;
+
+
+    @Autowired
+    private JwtUtils jwtUtil;
+
+    @Autowired
     private AccessInterface accessInterface;
+
+    @Autowired
+    private Authenticate authenticate;
+
+
+    @Value("${custom.isTokenVerification}")
+    private String isTokenVerification;
+
+    @Value("${serviceCode}")
+    private String serviceCode;
+
     private static Map<String, ColumnShort> columnShortMap;
+
     static {
         columnShortMap = new HashMap<>();
-        columnShortMap.put("sfzhm",new ColumnShort("sfzhm","eq","身份证号码"));
-//        columnShortMap.put("death_date",new ColumnShort(null,"eq",true,false,null,true));
+        columnShortMap.put("sfzhm", new ColumnShort("sfzhm", "eq", "身份证号码"));
+
     }
 
     public ResultInfo getData(Integer pageNo, Integer pageSize, String search, String showColumns,
                               Long resourceId, String token, HttpServletRequest request) {
-        LocalDateTime start = LocalDateTime.now();
-        String message = "";
-        ResultInfo resultInfo = new ResultInfo();
-        // search  [{"a.eq":"1"},{"and.b.eq":"2"}]
-        /*
-          token认证过程
-         */
-        /*JwtUserToken userToken = null;
-        try {
-            userToken = JwtUtil.getJwtUserToken(token);
-        } catch (Exception e) {
-            resultInfo.setCode(ResultCode.ERROR);
-            resultInfo.setErrorFlag(ErrorFlagCode.NORMAL);
-            resultInfo.setMessage(e.getMessage());
-            return resultInfo;
-        }*/
-        /*
-         * IP校验
-         */
-        /*if (!IpUtil.IpVerify(userToken.getIp(),request)){
-            resultInfo.setCode(ResultCode.ERROR);
-            resultInfo.setErrorFlag(ErrorFlagCode.NORMAL);
-            resultInfo.setMessage("IP地址无效");
-            return resultInfo;
-        }*/
-        /*
-         * 字段权限的控制
-         */
-//        AuthField authField = Authenticate.getInstance().authorityVer(userToken.getUserId(), resourceId);
-        AuthField authField = testMoniAuthField();
-        //权限的判断
-        /*
-         * 构建title
-         */
-        List<Column> columns = TitleUtil.buildTitle(authField, columnShortMap);
-        //解析参数拼接xmldoc，访问接口
-        Map<String, String> extParam = parseSearch(search);
-        if (extParam.size() == 0) {
-            message = "请输入查询条件...";
-            resultInfo.setMessage(message);
-            return resultInfo;
-        } else if (extParam.size() != 1) {
-            message = "只能输入一个查询条件...";
-            resultInfo.setMessage(message);
-            return resultInfo;
-        }
-
-        String result = postRequest(pageNo, pageSize, extParam);
-//        String result = testMoniData();
+        long startTime = System.currentTimeMillis();
         List<Dysqmx> data = null;
         PageResponse<Dysqmx> page = new PageResponse<>();
-        page.setTitle(columns);
-        // 装配并解析对象
-        if (StringUtils.isNotBlank(result)) {
-            try {
-                data = XmlParseObject.convertXMLtoObjectList(Dysqmx.class,result);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        /*
-         * 字段处理，取出多余字段
-         */
-        List<String> allowField = FieldHandle.getAllowField(authField.getFieldNames(), showColumns);
-        FieldHandle.removeFields(data,allowField);
-        page.setResult(data);
-        page.setPageNo(pageNo);
-        resultInfo.setData(page);
-        resultInfo.setMessage(message);
-        /*
-         * 日志记录
-         */
-        //ServiceLog.logSuccess(resourceId,userToken.getUserId(),userToken.getIp(),start,resultInfo);
-        return resultInfo;
-    }
+        ResultInfo resultInfo = new ResultInfo();
+        JwtUserTokenDto userToken = null;
+        JwtIPDto requestIp = null;
+        Integer stdcall = 1;
+//            token认证过程 12345
+        ResourceFieldAuth authField = null;
 
+        List<Column> columns = null;
+        //测试时候isTokenVerification设置为false
+        if ("false".equals(isTokenVerification)) {
+            //ip校验
+            requestIp = IPProcess.getRequestIp(request);
+            stdcall = requestIp.getStdcall();
+            userToken = new JwtUserTokenDto();
+            userToken.setUserId(225577573428629504L);
+            userToken.setIp("127.0.0.1");
+            //字段权限的控制
+            authField = testMoniAuthField();
+            //构建title
+            columns = TitleUtil.buildTitle(authField, columnShortMap);
+        } else {
+            try {
+                //ip校验
+                requestIp = IPProcess.getRequestIp(request);
+                stdcall = requestIp.getStdcall();
+                //token校验
+                userToken = jwtUtil.getJwtUserToken(token);
+                //字段权限的控制
+                authField = authenticate.authorityVer(userToken.getUserId(), resourceId);
+                //构建title
+                columns = TitleUtil.buildTitle(authField, columnShortMap);
+//                //构建title
+//                columns = TitleUtil.buildTitle(authField, columnShortMap);
+
+            } catch (Exception e) {
+                resultInfo.setCode(ResultCode.ERROR);
+                resultInfo.setErrorFlag(ErrorFlagCode.PLATFORMERROR);
+                resultInfo.setMessage(e.getMessage());
+                sinkLogKafka(resourceId, userToken, null, startTime, "1", "401", "0", stdcall);
+                return resultInfo;
+            }
+
+        }
+
+        try {
+            resultInfo = accessInterface.postRequest(pageNo, pageSize, search, null,columns);
+            sinkLogKafka(resourceId, userToken, data, startTime, "0", "200", "0", stdcall);//日志记录
+            return resultInfo;
+        } catch (Exception e) {
+            e.printStackTrace();
+            resultInfo.setCode(ResultCode.ERROR);
+            resultInfo.setErrorFlag(ErrorFlagCode.PROVIDEERROR);
+            resultInfo.setMessage(e.getMessage());
+            sinkLogKafka(resourceId, userToken, data, startTime, "1", "401", "0", stdcall);
+            return resultInfo;
+        }
+
+    }
     /**
      * 测试字段权限控制
      * @return
      */
-    private AuthField testMoniAuthField(){
-        AuthField authField = new AuthField();
+    /**
+     * 测试字段权限控制
+     *
+     * @return
+     */
+    private ResourceFieldAuth testMoniAuthField() {
+        //todo 待删除
+        ResourceFieldAuth authField = new ResourceFieldAuth();
         authField.setFlag(true);
-        Field field1 = new Field().setDataCode("sfzhm");
-        List<Field> list = new ArrayList<>();
-        list.add(field1);
+        FieldDto fieldDto = new FieldDto();
+        fieldDto.setDataCode("工商登记号码_社团登记号");
+        fieldDto.setDataName("测试哈哈哈");
+        List<FieldDto> list = new ArrayList<>();
+        list.add(fieldDto);
+
         authField.setFields(list);
-        authField.setFieldNames(list.stream().map(Field::getDataCode).collect(Collectors.toList()));
+        authField.setFieldNames(list.stream().map(FieldDto::getDataCode).collect(Collectors.toList()));
         return authField;
     }
 
-    private String postRequest(Integer pageNo, Integer pageSize, Map<String, String> extParam) {
-        Map<String, String> paramsMap = new HashMap<>();
-        String result = null;
-        paramsMap.put("sfzhm","");
-        if (extParam.get("sfzhm")!=null){
-            paramsMap.put("sfzhm",extParam.get("sfzhm"));
-        }
-        // 拼装参数xmlDoc
-        String xmlDoc = CustomConstant.queryXML.replaceAll("\\$pageNo\\$", pageNo.toString())
-                .replaceAll("\\$pageSize\\$", pageSize.toString())
-                .replaceAll("\\$condition\\$", buildQueryXml(paramsMap));
-        System.out.println(xmlDoc);
-        result = accessInterface.call("01", "01Q40", xmlDoc);
-        return result;
-    }
+    /**
+     * 日志记录
+     *
+     * @param resourceId
+     * @param userToken
+     * @param data
+     * @param startTime
+     */
+    private void sinkLogKafka(Long resourceId,
+                              JwtUserTokenDto userToken,
+                              List<Dysqmx> data,
+                              Long startTime,
+                              String type,
+                              String statusCode, String logType, Integer stdcall) {
+        ResourceTransferLog resourceTransferLog = new ResourceTransferLog();
+        resourceTransferLog.setResourceId(resourceId + "");
+        resourceTransferLog.setServiceCode(serviceCode);
 
-    private String buildQueryXml(Map<String, String> param) {
-        StringBuilder sb = new StringBuilder();
-        Set<String> keys = param.keySet();
-        for (Iterator<String> iterator = keys.iterator(); iterator.hasNext(); ) {
-            String key = iterator.next();
-            String value = param.get(key);
-            if (StringUtils.isNotBlank(value)) {
-                sb.append("<" + key + ">" + value + "</" + key + ">");
-            }
+        if (data == null) {
+            resourceTransferLog.setDataNumber("0");
+        } else {
+            resourceTransferLog.setDataNumber(data.size() + "");
         }
-        return sb.toString();
-    }
 
+        if (userToken == null) {
+            resourceTransferLog.setCallsIp(null);
+            resourceTransferLog.setUserId(null);
+        } else {
+            resourceTransferLog.setCallsIp(userToken.getIp());
+            resourceTransferLog.setUserId(userToken.getUserId() + "");
+        }
 
-    private Map<String, String> parseSearch(String search) {
-        Map<String, String> map = new HashMap<>();
-        if (StringUtils.isBlank(search)) {
-            return map;
-        }
-        JsonParser parser = new JsonParser();
-        JsonArray jsonArray = parser.parse(search).getAsJsonArray();
-        for (int i = 0; i < jsonArray.size(); i++) {
-            JsonObject jsonObject = jsonArray.get(i).getAsJsonObject();
-            Set<String> keys = jsonObject.keySet();
-            for (Iterator<String> iterator = keys.iterator(); iterator.hasNext(); ) {
-                String key = iterator.next();
-                String value = jsonObject.get(key).getAsString();
-                key = key.replaceAll("and.|or.|.neq|.eq|.gte|.lte|.gt|.lt|.like|.in|.isNotNull|.isNull", "");
-                map.put(key.toLowerCase(), value);
-            }
-        }
-        return map;
+        resourceTransferLog.setLogType(logType);
+        resourceTransferLog.setResponseTime((System.currentTimeMillis() - startTime) / 1000.000 + "");
+        resourceTransferLog.setStatusCode(statusCode);
+        //0:平台调用  1：非平台调用
+        resourceTransferLog.setStdcall(stdcall + "");
+        resourceTransferLog.setTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        resourceTransferLog.setTraffic((JacksonUtil.getJson(data).getBytes().length / 1000.00) + "");
+        resourceTransferLog.setType(type);
+        sinkLog.sinkLogToKafka(resourceTransferLog);
     }
 }

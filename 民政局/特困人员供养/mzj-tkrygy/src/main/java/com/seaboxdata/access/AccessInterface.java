@@ -1,7 +1,13 @@
 package com.seaboxdata.access;
 
+import com.seaboxdata.api.dto.ResourceFieldAuth;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import com.seaboxdata.api.core.auth.FieldHandle;
+import com.seaboxdata.api.core.model.Column;
+import com.seaboxdata.api.core.model.ColumnShort;
 import com.seaboxdata.api.core.model.PageResponse;
+import com.seaboxdata.api.core.model.ResultInfo;
 import com.seaboxdata.api.core.utils.DESUtil;
 import com.seaboxdata.api.core.utils.HttpClientCallSoapUtil;
 import com.seaboxdata.api.core.utils.RSAUtil;
@@ -29,10 +35,12 @@ public class AccessInterface {
     @Value("${custom.namespaceURI}")
     private String namespaceURI;
 
-    private String postRequest(Integer pageNo, Integer pageSize, Map<String, String> extParam) {
+    public ResultInfo postRequest(Integer pageNo, Integer pageSize, String search , String showColumns, List<Column> columns)throws Exception {
+        ResultInfo resultInfo = new ResultInfo();
         Map<String, String> paramsMap = new HashMap<>();
         String result = null;
         paramsMap.put("sfzhm","");
+        Map<String, String> extParam = parseSearchs(search);
         if (extParam.get("sfzhm")!=null){
             paramsMap.put("sfzhm",extParam.get("sfzhm"));
         }
@@ -58,19 +66,14 @@ public class AccessInterface {
         /*
          * 字段处理，取出多余字段
          */
+        ResourceFieldAuth authField = null;
         List<String> allowField = FieldHandle.getAllowField(authField.getFieldNames(), showColumns);
         FieldHandle.removeFields(data,allowField);
         page.setResult(data);
         page.setPageNo(pageNo);
         resultInfo.setData(page);
-        resultInfo.setMessage(message);
-        /*
-         * 日志记录
-         */
-        //ServiceLog.logSuccess(resourceId,userToken.getUserId(),userToken.getIp(),start,resultInfo);
+        resultInfo.setMessage("查询成功");
         return resultInfo;
-
-        return result;
     }
 
     /**
@@ -118,4 +121,43 @@ public class AccessInterface {
         }
         return sb.toString();
     }
+    /**
+     * 提取查询条件（该方法可复用）
+     *
+     * @param search
+     * @return <条件名称全小写，条件值>
+     * @author dengshengyu
+     * @date 2018年5月7日上午11:57:02
+     */
+    private Map<String, String> parseSearchs(String search) {
+        Map<String, String> map = new HashMap<>();
+        if (search == null || "".equals(search.trim())) {
+            return map;
+        }
+        try {
+            JSONArray jsonArr = new JSONArray(search);
+            for (int i = 0; i < jsonArr.length(); i++) {
+                JSONObject jsonObj = jsonArr.getJSONObject(i);
+                String key = jsonObj.keys().next();
+                String value = jsonObj.getString(key);
+                key = key.toLowerCase();
+                key = key.replace(".eq", "");
+                key = key.replace(".like", "");
+                key = key.replace(".gt", "");
+                key = key.replace(".lt", "");
+                key = key.replace(".or", "");
+                key = key.replace(".and", "");
+                key = key.replace(".gte", "");
+                key = key.replace(".lte", "");
+                key = key.replace(".in", "");
+                key = key.replace(".isNotNull", "");
+                key = key.replace(".isNull", "");
+                map.put(key.toLowerCase(), value);
+            }
+        } catch (Exception e) {
+            return map;
+        }
+        return map;
+    }
+
 }

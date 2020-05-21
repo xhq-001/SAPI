@@ -17,7 +17,6 @@ import javax.xml.ws.Endpoint;
 @Configuration
 @Slf4j
 public class CxfConfig {
-
     @Autowired
     private Bus bus;
 
@@ -31,10 +30,10 @@ public class CxfConfig {
      *
      * @return 端点
      */
-    @Bean
+    @org.springframework.context.annotation.Bean
     public Endpoint endpoint() {
         EndpointImpl endpoint = new EndpointImpl(bus, webServiceController);
-        endpoint.publish("/"+ CustomConstant.serviceCode);
+        endpoint.publish("/");
         log.info("共享接口WebService服务发布成功");
         return endpoint;
     }
