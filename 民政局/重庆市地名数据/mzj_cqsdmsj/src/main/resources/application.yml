@@ -1,0 +1,69 @@
+serviceCode: mzj_cqsdmsj
+request:
+  socketTimeout: 60000
+  connectTimeout: 60000
+server:
+  port: 20003
+
+custom:
+  url: http://23.29.250.6:80/cqdm/api/getDiMing
+  key: 55511a5da58d4a519058c2f98db8870a
+  isTokenVerification: false
+spring:
+  application:
+    name: mzj_cqsdmsj
+  kafka:
+    producerNum: 1
+    bootstrap-servers: 10.10.30.11:6667
+    acks: 1
+    retries: 3
+    batchSize: 16384
+    compressionType: gzip
+    linger-ms: 5000
+    bufferMemory: 33554432
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    topic-userAction: sp_Userbehavelog
+    topic-userLogin: sp_Userloginlog
+    topic-serviceAccess: sp_Interfacelog
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    registryFetchIntervalSeconds: 5
+    service-url:
+      defaultZone: http://109.244.99.167:30009/eureka/  #本地互联网测试eureka
+seaboxdata:
+  core:
+    idgenerator:
+      mode: snowflake
+      datacenter: 1
+      worker: 1
+  rsp:
+    hostname: rsp-service.cqsqd.com
+  workflow:
+    hostname:
+  sesb:
+    authority: true
+    log-enable: true
+    redis:
+      database: 2
+      password:
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 5
+          min-idle: 0
+      timeout: 10000ms
+      sentinel:
+        master: mymaster
+        nodes:
+          - 10.10.30.15:8000
+ribbon:
+  eureka:
+    enabled: true
+  ReadTimeout: 60000
+  ConnectTimeout: 60000
+cxf:
+  path: /webservice
