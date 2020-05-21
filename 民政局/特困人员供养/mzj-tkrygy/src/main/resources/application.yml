@@ -1,0 +1,66 @@
+server:
+  port: 10001
+custom:
+  webserviceURL: http://23.29.250.100:8082/ws/NetWsService?wsdl
+  namespaceURI: http://ws.bus.cqhg.com/
+  jksqm: BUY8WV6VPKBH7A1TWVG26OXYC4HO2R2YRYXCZU85YLT89UY56BF0DGDOZGWZM9TGI8T759ZUHABFJW3IGXOF8GMRFTBM32MGTNFE4Y0NMQFWCH7GDLEUQF7X25T8CM
+  publicKey: MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDphchZIndicD8yr6Peo/5shpppzGJfllKI4cYDJ16OQfeOqmOAGELoAgTKWgN0GvEZnqhcX9JKgZa/91uhSK+ar0Z4P9eqKJqw9BJYALVEEDWlLIH9YiRty6Ddl3JRkPO/oGGngvssYshEgWyT3r5ODOIsWCoqAd7/H7f2s12UHQIDAQAB
+spring:
+  application:
+    name: mzj-tkrygy
+  kafka:
+    producerNum: 1
+    bootstrap-servers: 10.10.30.11:6667
+    acks: 1
+    retries: 3
+    batchSize: 16384
+    compressionType: gzip
+    linger-ms: 5000
+    bufferMemory: 33554432
+    key-serializer: org.apache.kafka.common.serialization.StringSerializer
+    value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    topic-userAction: sp_Userbehavelog
+    topic-userLogin: sp_Userloginlog
+    topic-serviceAccess: sp_Interfacelog
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    registryFetchIntervalSeconds: 5
+    service-url:
+      defaultZone: http://109.244.99.167:30009/eureka/  #本地互联网测试eureka
+seaboxdata:
+  core:
+    idgenerator:
+      mode: snowflake
+      datacenter: 1
+      worker: 1
+  rsp:
+    hostname: rsp-service.cqsqd.com
+  workflow:
+    hostname:
+  sesb:
+    authority: true
+    log-enable: true
+    redis:
+      database: 2
+      password:
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 5
+          min-idle: 0
+      timeout: 10000ms
+      sentinel:
+        master: mymaster
+        nodes:
+          - 10.10.30.15:8000
+ribbon:
+  eureka:
+    enabled: true
+  ReadTimeout: 60000
+  ConnectTimeout: 60000
+cxf:
+  path: /webservice
+
